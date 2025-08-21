@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<title>Countdown Eventi</title>
+<style>
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+  body {
+    font-family: Arial, sans-serif;
+    color: white;
+    background: url('https://yamahamotogp.s3-eu-west-1.amazonaws.com/31-01-2025-monster-energy-yamaha-motogp-riders/quartararo-rins/media/MEYMm_01_2025%20Quartararo-Rins.jpg?AWSAccessKeyId=AKIAJJ6WQFZ2IJINZCTA&Expires=1755795400&Signature=U%2FiMJPNT5VGE1Pn8yp3XnCnsJE4%3D') no-repeat center center fixed;
+    background-size: cover;
+  }
+  #header {
+    position: relative;
+    padding: 20px;
+  }
+  #fileInput {
+    font-size: 16px;
+  }
+  #orario {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 28px;
+    font-weight: bold;
+    color: white;
+    user-select: none;
+    text-shadow: 0 0 5px black;
+    z-index: 10;
+  }
+  #eventi_riepilogo {
+    margin: 80px 0 40px 20px;
+    width: 350px;
+    font-size: 18px;
+    line-height: 1.4em;
+  }
+  .evento_passato {
+    text-decoration: line-through;
+    color: gray;
+  }
+  .prossimo_evento {
+    font-weight: bold;
+    color: #ffd700; /* giallo per risaltare */
+  }
+  #countdown_centrale {
+    font-size: 52px;
+    font-weight: bold;
+    text-align: center;
+    white-space: pre-line;
+    user-select: none;
+    margin-top: 40px;
+    color: black;
+    text-shadow: 0 0 5px white;
+  }
+</style>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<div id="header">
+  <input type="file" id="fileInput" accept=".xlsx" />
+  <div id="orario">--:--:--</div>
+</div>
+
+<div id="eventi_riepilogo"></div>
+<div id="countdown_centrale">Carica un file Excel per iniziare</div>
+
+<script>
+  let eventi = [];
+  let prossimoEventoIndex = null;
+
+  const orarioEl = document.getElementById('orario');
+  const eventiRiepilogoEl = document.getElementById('eventi_riepilogo');
+  const countdownCentraleEl = document.getElementById('countdown_centrale');
+  const fileInput = document.getElementById('fileInput');
+
+  function excelTimeToHHMM(excelTime) {
+    let totalMinutes = Math.round(excelTime * 24 * 60);
+    let hours = Math.floor(totalMinutes / 60);
+    let minutes = totalMinutes % 60;
+    return `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}`;
+  }
+
+  fileInput.addEventListener('change', function(evt){
+    const file = evt.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, {type: 'array'});
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const json = XLSX.utils.sheet_to_json(worksheet, {header:["Ora","Evento"], defval:""});
+
+      if (json.length > 0 && (String(json[0].Ora).toLowerCase() === "ora" || String(json[0].Evento).toLowerCase() === "evento")) {
+        json.shift();
+      }
+
+      eventi = json.map(row => {
+        let oraStr;
+        if (typeof row.Ora === "number") {
+          oraStr = excelTimeToHHMM(row.Ora);
+        } else {
+          oraStr = String(row.Ora).trim();
+        }
+        return {
+          ora: oraStr,
+          evento: String(row.Evento).trim()
+        };
+      }).filter(e => e.ora && e.evento);
+
+      eventi.forEach(ev => {
+        const [h,m] = ev.ora.split(":").map(x=>parseInt(x));
+        ev.minuti = h*60 + m;
+      });
+
+      eventi.sort((a,b) => a.minuti - b.minuti);
+      prossimoEventoIndex = null;
+
+      aggiornaVisualizzazione();
+      startTimer();
+    }
+    reader.readAsArrayBuffer(file);
+  });
+
+  function aggiornaOrario() {
+    const now = new Date();
+    orarioEl.textContent = now.toLocaleTimeString();
+  }
+
+  function aggiornaVisualizzazione() {
+    const now = new Date();
+    const minutiAdesso = now.getHours()*60 + now.getMinutes();
+
+    prossimoEventoIndex = null;
+
+    eventiRiepilogoEl.innerHTML = eventi.map((ev, i) => {
+      const passato = ev.minuti < minutiAdesso;
+      if (!passato && prossimoEventoIndex === null) prossimoEventoIndex = i;
+      let classi = "";
+      if (passato) classi = "evento_passato";
+      else if (prossimoEventoIndex === i) classi = "prossimo_evento";
+      return `<div class="${classi}">${ev.ora} - ${ev.evento.toUpperCase()}</div>`;
+    }).join("");
+
+    if (prossimoEventoIndex !== null && prossimoEventoIndex < eventi.length) {
+      const ev = eventi[prossimoEventoIndex];
+      const nowSec = now.getHours()*3600 + now.getMinutes()*60 + now.getSeconds();
+      const evSec = ev.minuti*60;
+      let diffSec = evSec - nowSec;
+      if (diffSec < 0) diffSec = 0;
+
+      const minuti = Math.floor(diffSec / 60);
+      const secondi = diffSec % 60;
+
+      countdownCentraleEl.textContent = `MANCANO ${minuti} MINUTI E ${secondi} SECONDI ALL'INIZIO DI:\n\n${ev.evento.toUpperCase()}`;
+    } else {
+      countdownCentraleEl.textContent = "NESSUN EVENTO IN PROGRAMMA";
+    }
+  }
+
+  let timerId = null;
+  function startTimer(){
+    if(timerId) clearInterval(timerId);
+    aggiornaOrario();
+    aggiornaVisualizzazione();
+    timerId = setInterval(() => {
+      aggiornaOrario();
+      aggiornaVisualizzazione();
+    }, 1000);
+  }
+</script>
+
+</body>
+</html>
