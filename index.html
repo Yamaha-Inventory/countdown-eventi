@@ -49,7 +49,7 @@
   }
   #countdown_centrale {
     position: fixed;
-    top: 40%;
+    top: 38%;  /* spostato leggermente su */
     left: 50%;
     transform: translate(-50%, -50%);
     font-size: 56px;
@@ -83,6 +83,16 @@
   const fileInput = document.getElementById('fileInput');
   let timerId = null;
 
+  // Funzione per convertire numero seriale Excel in "HH:MM"
+  function excelTimeToHHMM(excelTime) {
+    let totalSeconds = Math.round(excelTime * 24 * 3600);
+    let hours = Math.floor(totalSeconds / 3600);
+    let minutes = Math.floor((totalSeconds % 3600) / 60);
+    if (hours < 10) hours = "0" + hours;
+    if (minutes < 10) minutes = "0" + minutes;
+    return `${hours}:${minutes}`;
+  }
+
   fileInput.addEventListener('change', function(evt){
     const file = evt.target.files[0];
     if (!file) return;
@@ -95,18 +105,38 @@
       const worksheet = workbook.Sheets[firstSheetName];
       const json = XLSX.utils.sheet_to_json(worksheet, {header:["Ora","Evento"], defval:""});
 
+      // Rimuove header se presente
       if (json.length > 0 && (String(json[0].Ora).toLowerCase() === "ora" || String(json[0].Evento).toLowerCase() === "evento")) {
         json.shift();
       }
 
-      eventi = json.map(row => ({
-        ora: String(row.Ora).trim(),
-        evento: String(row.Evento).trim()
-      })).filter(e => e.ora && e.evento);
+      eventi = json.map(row => {
+        let oraRaw = row.Ora;
+        let oraStr = "";
 
+        if (typeof oraRaw === "number") {
+          // Excel serial time -> stringa hh:mm
+          oraStr = excelTimeToHHMM(oraRaw);
+        } else {
+          oraStr = String(oraRaw).trim();
+        }
+
+        return {
+          ora: oraStr,
+          evento: String(row.Evento).trim()
+        };
+      }).filter(e => e.ora && e.evento);
+
+      // Calcola minuti da ora
       eventi.forEach(ev => {
-        const [h,m] = ev.ora.split(":").map(x=>parseInt(x));
-        ev.minuti = h*60 + m;
+        const parts = ev.ora.split(":");
+        if(parts.length === 2){
+          const h = parseInt(parts[0]);
+          const m = parseInt(parts[1]);
+          ev.minuti = h * 60 + m;
+        } else {
+          ev.minuti = 0; // fallback
+        }
       });
 
       eventi.sort((a,b) => a.minuti - b.minuti);
