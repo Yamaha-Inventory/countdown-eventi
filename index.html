@@ -8,7 +8,7 @@
     height: 100%;
     margin: 0;
     font-family: Arial, sans-serif;
-    background-image: url('background.jpg'); /* L'immagine deve essere nella stessa cartella di index.html */
+    background-image: url('monster.jpg'); /* immagine sfondo */
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -19,7 +19,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 10px 20px;
-    background: transparent; /* nessun colore dietro */
+    background: transparent;
   }
   #fileInput {
     font-size: 16px;
@@ -27,7 +27,7 @@
   #orario {
     font-size: 28px;
     font-weight: bold;
-    background: transparent; /* nessun sfondo */
+    background: transparent;
     user-select: none;
   }
   #eventi_riepilogo {
@@ -39,7 +39,7 @@
     overflow-y: auto;
     font-size: 18px;
     line-height: 1.4em;
-    background: transparent; /* nessun sfondo */
+    background: transparent;
     user-select: none;
     color: black;
   }
@@ -58,7 +58,7 @@
     white-space: pre-line;
     user-select: none;
     color: black;
-    background: transparent; /* nessun sfondo */
+    background: transparent;
   }
 </style>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
@@ -95,7 +95,6 @@
       const worksheet = workbook.Sheets[firstSheetName];
       const json = XLSX.utils.sheet_to_json(worksheet, {header:["Ora","Evento"], defval:""});
 
-      // Rimuove eventuale header se presente
       if (json.length > 0 && (String(json[0].Ora).toLowerCase() === "ora" || String(json[0].Evento).toLowerCase() === "evento")) {
         json.shift();
       }
@@ -105,13 +104,11 @@
         evento: String(row.Evento).trim()
       })).filter(e => e.ora && e.evento);
 
-      // Converte ore in minuti per confronto
       eventi.forEach(ev => {
         const [h,m] = ev.ora.split(":").map(x=>parseInt(x));
         ev.minuti = h*60 + m;
       });
 
-      // Ordina per orario
       eventi.sort((a,b) => a.minuti - b.minuti);
       prossimoEventoIndex = null;
 
@@ -130,7 +127,6 @@
     const now = new Date();
     const minutiAdesso = now.getHours()*60 + now.getMinutes();
 
-    // Trova primo evento futuro
     prossimoEventoIndex = null;
 
     eventiRiepilogoEl.innerHTML = eventi.map((ev, i) => {
