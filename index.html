@@ -87,14 +87,14 @@
         eventName: String(row.Event).trim()
       })).filter(e => e.timeStr && e.eventName);
 
-      // Convert time to seconds from midnight for precise comparison
+      // Convert time to minutes from midnight for sorting and comparison
       events.forEach(ev => {
-        const [h, m, s=0] = ev.timeStr.split(":").map(x => parseInt(x));
-        ev.secondsFromMidnight = h * 3600 + m * 60 + s;
+        const [h, m] = ev.timeStr.split(":").map(x => parseInt(x));
+        ev.minutesFromMidnight = h * 60 + m;
       });
 
-      // Sort events by time ascending
-      events.sort((a,b) => a.secondsFromMidnight - b.secondsFromMidnight);
+      // Sort events by ascending time
+      events.sort((a,b) => a.minutesFromMidnight - b.minutesFromMidnight);
 
       nextEventIndex = null;
       updateDisplay();
@@ -110,13 +110,13 @@
 
   function updateDisplay() {
     const now = new Date();
-    const nowSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
     nextEventIndex = null;
 
-    // Generate summary with events and time, crossing out past events including their time
+    // Build summary with crossed out events and times
     eventsSummaryEl.innerHTML = events.map((ev, i) => {
-      const passed = ev.secondsFromMidnight <= nowSeconds;
+      const passed = ev.minutesFromMidnight < nowMinutes;
       if (!passed && nextEventIndex === null) nextEventIndex = i;
       const className = passed ? "event-passed" : "";
       return `<div class="${className}">${ev.timeStr} - ${ev.eventName.toUpperCase()}</div>`;
@@ -125,7 +125,9 @@
     // Central countdown
     if (nextEventIndex !== null && nextEventIndex < events.length) {
       const ev = events[nextEventIndex];
-      let diffSeconds = ev.secondsFromMidnight - nowSeconds;
+      const nowSeconds = now.getHours()*3600 + now.getMinutes()*60 + now.getSeconds();
+      const evSeconds = ev.minutesFromMidnight*60;
+      let diffSeconds = evSeconds - nowSeconds;
       if (diffSeconds < 0) diffSeconds = 0;
 
       const minutes = Math.floor(diffSeconds / 60);
