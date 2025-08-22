@@ -8,7 +8,7 @@
     height: 100%;
     margin: 0;
     font-family: Arial, sans-serif;
-    background-image: url('monster.jpg'); /* Background image */
+    background-image: url('monster.jpg');
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -49,7 +49,7 @@
   }
   #centralCountdown {
     position: fixed;
-    top: 38%;
+    top: 35%;
     left: 50%;
     transform: translate(-50%, -50%);
     font-size: 56px;
@@ -76,12 +76,12 @@
 <script>
   let events = [];
   let nextEventIndex = null;
+  let timerId = null;
 
   const timeDisplay = document.getElementById('currentTime');
   const summaryDisplay = document.getElementById('eventSummary');
   const countdownDisplay = document.getElementById('centralCountdown');
   const fileInput = document.getElementById('fileInput');
-  let timerId = null;
 
   function excelTimeToHHMM(excelTime) {
     let totalSeconds = Math.round(excelTime * 24 * 3600);
@@ -92,7 +92,7 @@
     return `${hours}:${minutes}`;
   }
 
-  fileInput.addEventListener('change', function(evt){
+  fileInput.addEventListener('change', function(evt) {
     const file = evt.target.files[0];
     if (!file) return;
 
@@ -104,7 +104,8 @@
       const worksheet = workbook.Sheets[firstSheetName];
       const json = XLSX.utils.sheet_to_json(worksheet, {header:["Time","Event"], defval:""});
 
-      // Check and keep the header separately
+      console.log("Raw Excel JSON:", json);
+
       let headerText = "";
       if (json.length > 0 && (
           String(json[0].Time).toLowerCase() === "time" ||
@@ -120,8 +121,11 @@
 
         if (typeof rawTime === "number") {
           timeStr = excelTimeToHHMM(rawTime);
+        } else if (typeof rawTime === "string" && rawTime.includes(":")) {
+          timeStr = rawTime.trim();
         } else {
-          timeStr = String(rawTime).trim();
+          console.warn("Invalid time format:", rawTime);
+          timeStr = "";
         }
 
         return {
@@ -130,9 +134,11 @@
         };
       }).filter(e => e.time && e.event);
 
+      console.log("Parsed Events:", events);
+
       events.forEach(ev => {
         const parts = ev.time.split(":");
-        if(parts.length === 2){
+        if (parts.length === 2) {
           const h = parseInt(parts[0]);
           const m = parseInt(parts[1]);
           ev.minutes = h * 60 + m;
@@ -175,7 +181,6 @@
 
     summaryDisplay.innerHTML = summaryHTML;
 
-    // Update central countdown
     if (nextEventIndex !== null && nextEventIndex < events.length) {
       const ev = events[nextEventIndex];
       const nowSec = now.getHours()*3600 + now.getMinutes()*60 + now.getSeconds();
@@ -193,9 +198,15 @@
   }
 
   function startTimer(headerText){
-    if(timerId) clearInterval(timerId);
+    if (timerId) clearInterval(timerId);
     updateClock();
     updateDisplay(headerText);
     timerId = setInterval(() => {
       updateClock();
-      updateDisplay(headerTe
+      updateDisplay(headerText);
+    }, 1000);
+  }
+</script>
+
+</body>
+</html>
