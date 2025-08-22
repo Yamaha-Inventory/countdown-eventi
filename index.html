@@ -2,24 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Event Countdown</title>
+<title>Events Countdown</title>
 <style>
-  html, body {
-    height: 100%;
-    margin: 0;
+  body {
     font-family: Arial, sans-serif;
-    background-image: url('monster.jpg');
+    margin: 20px;
+    background: white url('https://yamahamotogp.s3-eu-west-1.amazonaws.com/31-01-2025-monster-energy-yamaha-motogp-riders/quartararo-rins/media/MEYMm_01_2025%20Quartararo-Rins.jpg?AWSAccessKeyId=AKIAJJ6WQFZ2IJINZCTA&Expires=1755795400&Signature=U%2FiMJPNT5VGE1Pn8yp3XnCnsJE4%3D') no-repeat center center fixed;
     background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
     color: black;
   }
   #header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 20px;
-    background: transparent;
+    margin-bottom: 20px;
   }
   #fileInput {
     font-size: 16px;
@@ -27,38 +23,24 @@
   #currentTime {
     font-size: 28px;
     font-weight: bold;
-    background: transparent;
-    user-select: none;
   }
-  #eventSummary {
-    position: fixed;
-    top: 60px;
-    left: 20px;
+  #eventsSummary {
+    margin-bottom: 40px;
     width: 320px;
-    max-height: 80vh;
-    overflow-y: auto;
     font-size: 18px;
     line-height: 1.4em;
-    background: transparent;
-    user-select: none;
-    color: black;
   }
-  .pastEvent {
+  .event-passed {
     text-decoration: line-through;
     color: gray;
   }
   #centralCountdown {
-    position: fixed;
-    top: 35%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 56px;
+    font-size: 52px;
     font-weight: bold;
     text-align: center;
     white-space: pre-line;
     user-select: none;
-    color: black;
-    background: transparent;
+    margin-top: 60px;
   }
 </style>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
@@ -70,7 +52,7 @@
   <div id="currentTime">--:--:--</div>
 </div>
 
-<div id="eventSummary">Upload an Excel file to view the events.</div>
+<div id="eventsSummary">Load an Excel file to begin</div>
 <div id="centralCountdown"></div>
 
 <script>
@@ -78,19 +60,10 @@
   let nextEventIndex = null;
   let timerId = null;
 
-  const timeDisplay = document.getElementById('currentTime');
-  const summaryDisplay = document.getElementById('eventSummary');
-  const countdownDisplay = document.getElementById('centralCountdown');
+  const currentTimeEl = document.getElementById('currentTime');
+  const eventsSummaryEl = document.getElementById('eventsSummary');
+  const centralCountdownEl = document.getElementById('centralCountdown');
   const fileInput = document.getElementById('fileInput');
-
-  function excelTimeToHHMM(excelTime) {
-    let totalSeconds = Math.round(excelTime * 24 * 3600);
-    let hours = Math.floor(totalSeconds / 3600);
-    let minutes = Math.floor((totalSeconds % 3600) / 60);
-    if (hours < 10) hours = "0" + hours;
-    if (minutes < 10) minutes = "0" + minutes;
-    return `${hours}:${minutes}`;
-  }
 
   fileInput.addEventListener('change', function(evt) {
     const file = evt.target.files[0];
@@ -104,106 +77,74 @@
       const worksheet = workbook.Sheets[firstSheetName];
       const json = XLSX.utils.sheet_to_json(worksheet, {header:["Time","Event"], defval:""});
 
-      console.log("Raw Excel JSON:", json);
-
-      let headerText = "";
-      if (json.length > 0 && (
-          String(json[0].Time).toLowerCase() === "time" ||
-          String(json[0].Time).toLowerCase() === "orario"
-      )) {
-        headerText = `${json[0].Time} - ${json[0].Event}`;
+      // Remove header row if present
+      if (json.length > 0 && (String(json[0].Time).toLowerCase() === "time" || String(json[0].Event).toLowerCase() === "event")) {
         json.shift();
       }
 
-      events = json.map(row => {
-        let rawTime = row.Time;
-        let timeStr = "";
+      events = json.map(row => ({
+        timeStr: String(row.Time).trim(),
+        eventName: String(row.Event).trim()
+      })).filter(e => e.timeStr && e.eventName);
 
-        if (typeof rawTime === "number") {
-          timeStr = excelTimeToHHMM(rawTime);
-        } else if (typeof rawTime === "string" && rawTime.includes(":")) {
-          timeStr = rawTime.trim();
-        } else {
-          console.warn("Invalid time format:", rawTime);
-          timeStr = "";
-        }
-
-        return {
-          time: timeStr,
-          event: String(row.Event).trim()
-        };
-      }).filter(e => e.time && e.event);
-
-      console.log("Parsed Events:", events);
-
+      // Convert time to seconds from midnight for precise comparison
       events.forEach(ev => {
-        const parts = ev.time.split(":");
-        if (parts.length === 2) {
-          const h = parseInt(parts[0]);
-          const m = parseInt(parts[1]);
-          ev.minutes = h * 60 + m;
-        } else {
-          ev.minutes = 0;
-        }
+        const [h, m, s=0] = ev.timeStr.split(":").map(x => parseInt(x));
+        ev.secondsFromMidnight = h * 3600 + m * 60 + s;
       });
 
-      events.sort((a,b) => a.minutes - b.minutes);
-      nextEventIndex = null;
+      // Sort events by time ascending
+      events.sort((a,b) => a.secondsFromMidnight - b.secondsFromMidnight);
 
-      updateDisplay(headerText);
-      startTimer(headerText);
-    }
+      nextEventIndex = null;
+      updateDisplay();
+      startTimer();
+    };
     reader.readAsArrayBuffer(file);
   });
 
-  function updateClock() {
+  function updateCurrentTime() {
     const now = new Date();
-    timeDisplay.textContent = now.toLocaleTimeString();
+    currentTimeEl.textContent = now.toLocaleTimeString();
   }
 
-  function updateDisplay(headerText = "") {
+  function updateDisplay() {
     const now = new Date();
-    const currentMinutes = now.getHours()*60 + now.getMinutes();
+    const nowSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+
     nextEventIndex = null;
 
-    let summaryHTML = "";
-
-    if (headerText) {
-      summaryHTML += `<div style="font-weight: bold; text-decoration: none; color: black; margin-bottom: 10px;">${headerText}</div>`;
-    }
-
-    summaryHTML += events.map((ev, i) => {
-      const isPast = ev.minutes < currentMinutes;
-      if (!isPast && nextEventIndex === null) nextEventIndex = i;
-      const className = isPast ? "pastEvent" : "";
-      return `<div class="${className}">${ev.time} - ${ev.event.toUpperCase()}</div>`;
+    // Generate summary with events and time, crossing out past events including their time
+    eventsSummaryEl.innerHTML = events.map((ev, i) => {
+      const passed = ev.secondsFromMidnight <= nowSeconds;
+      if (!passed && nextEventIndex === null) nextEventIndex = i;
+      const className = passed ? "event-passed" : "";
+      return `<div class="${className}">${ev.timeStr} - ${ev.eventName.toUpperCase()}</div>`;
     }).join("");
 
-    summaryDisplay.innerHTML = summaryHTML;
-
+    // Central countdown
     if (nextEventIndex !== null && nextEventIndex < events.length) {
       const ev = events[nextEventIndex];
-      const nowSec = now.getHours()*3600 + now.getMinutes()*60 + now.getSeconds();
-      const evSec = ev.minutes*60;
-      let diffSec = evSec - nowSec;
-      if (diffSec < 0) diffSec = 0;
+      let diffSeconds = ev.secondsFromMidnight - nowSeconds;
+      if (diffSeconds < 0) diffSeconds = 0;
 
-      const mins = Math.floor(diffSec / 60);
-      const secs = diffSec % 60;
+      const minutes = Math.floor(diffSeconds / 60);
+      const seconds = diffSeconds % 60;
 
-      countdownDisplay.textContent = `STARTING IN ${mins} MINUTES AND ${secs} SECONDS:\n\n${ev.event.toUpperCase()}`;
+      centralCountdownEl.textContent =
+        `MISSING ${minutes} MINUTES AND ${seconds} SECONDS\nTO START OF:\n\n${ev.eventName.toUpperCase()}`;
     } else {
-      countdownDisplay.textContent = "NO UPCOMING EVENTS";
+      centralCountdownEl.textContent = "NO UPCOMING EVENTS";
     }
   }
 
-  function startTimer(headerText){
-    if (timerId) clearInterval(timerId);
-    updateClock();
-    updateDisplay(headerText);
+  function startTimer() {
+    if(timerId) clearInterval(timerId);
+    updateCurrentTime();
+    updateDisplay();
     timerId = setInterval(() => {
-      updateClock();
-      updateDisplay(headerText);
+      updateCurrentTime();
+      updateDisplay();
     }, 1000);
   }
 </script>
