@@ -176,9 +176,9 @@
       const minuti = Math.floor(diffSec / 60);
       const secondi = diffSec % 60;
 
-      countdownCentraleEl.textContent = `MANCANO ${minuti} MINUTI E ${secondi} SECONDI ALL'INIZIO DI:\n\n${ev.evento.toUpperCase()}`;
+      countdownCentraleEl.textContent = `THERE ARE $ {minutes} MINUTES AND $ {seconds} SECONDS AT THE BEGINNING OF:\n\n${ev.evento.toUpperCase()}`;
     } else {
-      countdownCentraleEl.textContent = "NESSUN EVENTO IN PROGRAMMA";
+      countdownCentraleEl.textContent = "NO EVENT SCHEDULED";
     }
   }
 
@@ -195,3 +195,4 @@
 
 </body>
 </html>
+
