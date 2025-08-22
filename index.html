@@ -83,7 +83,6 @@
   const fileInput = document.getElementById('fileInput');
   let timerId = null;
 
-  // Convert Excel serial time to HH:MM
   function excelTimeToHHMM(excelTime) {
     let totalSeconds = Math.round(excelTime * 24 * 3600);
     let hours = Math.floor(totalSeconds / 3600);
@@ -105,8 +104,13 @@
       const worksheet = workbook.Sheets[firstSheetName];
       const json = XLSX.utils.sheet_to_json(worksheet, {header:["Time","Event"], defval:""});
 
-      // Remove header row if detected
-      if (json.length > 0 && (String(json[0].Time).toLowerCase() === "time" || String(json[0].Event).toLowerCase() === "event")) {
+      // Check and keep the header separately
+      let headerText = "";
+      if (json.length > 0 && (
+          String(json[0].Time).toLowerCase() === "time" ||
+          String(json[0].Time).toLowerCase() === "orario"
+      )) {
+        headerText = `${json[0].Time} - ${json[0].Event}`;
         json.shift();
       }
 
@@ -140,8 +144,8 @@
       events.sort((a,b) => a.minutes - b.minutes);
       nextEventIndex = null;
 
-      updateDisplay();
-      startTimer();
+      updateDisplay(headerText);
+      startTimer(headerText);
     }
     reader.readAsArrayBuffer(file);
   });
@@ -151,19 +155,27 @@
     timeDisplay.textContent = now.toLocaleTimeString();
   }
 
-  function updateDisplay() {
+  function updateDisplay(headerText = "") {
     const now = new Date();
     const currentMinutes = now.getHours()*60 + now.getMinutes();
-
     nextEventIndex = null;
 
-    summaryDisplay.innerHTML = events.map((ev, i) => {
+    let summaryHTML = "";
+
+    if (headerText) {
+      summaryHTML += `<div style="font-weight: bold; text-decoration: none; color: black; margin-bottom: 10px;">${headerText}</div>`;
+    }
+
+    summaryHTML += events.map((ev, i) => {
       const isPast = ev.minutes < currentMinutes;
       if (!isPast && nextEventIndex === null) nextEventIndex = i;
       const className = isPast ? "pastEvent" : "";
       return `<div class="${className}">${ev.time} - ${ev.event.toUpperCase()}</div>`;
     }).join("");
 
+    summaryDisplay.innerHTML = summaryHTML;
+
+    // Update central countdown
     if (nextEventIndex !== null && nextEventIndex < events.length) {
       const ev = events[nextEventIndex];
       const nowSec = now.getHours()*3600 + now.getMinutes()*60 + now.getSeconds();
@@ -180,16 +192,10 @@
     }
   }
 
-  function startTimer(){
+  function startTimer(headerText){
     if(timerId) clearInterval(timerId);
     updateClock();
-    updateDisplay();
+    updateDisplay(headerText);
     timerId = setInterval(() => {
       updateClock();
-      updateDisplay();
-    }, 1000);
-  }
-</script>
-
-</body>
-</html>
+      updateDisplay(headerTe
